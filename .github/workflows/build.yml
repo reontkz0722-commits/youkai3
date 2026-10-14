@@ -11,11 +11,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install git and libctrpf
+      - name: Install git, libctrpf and 3gxtool
         run: |
           (command -v git >/dev/null || (apt-get update && apt-get install -y git))
           grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf '\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n' >> /opt/devkitpro/pacman/etc/pacman.conf
           dkp-pacman -Sy --noconfirm libctrpf
+          echo "--- search 3gx packages ---"
+          dkp-pacman -Ss 3gx || true
+          dkp-pacman -S --noconfirm 3gxtool || true
+          echo "--- 3gxtool location ---"
+          find / -iname '3gxtool*' -not -path '*/proc/*' 2>/dev/null | head || true
 
       - name: Get CTRPluginFramework BlankTemplate
         run: |
@@ -24,6 +29,10 @@ jobs:
 
       - name: Build
         run: |
+          T=$(find / -type f -name 3gxtool -not -path '/proc/*' 2>/dev/null | head -1)
+          if [ -n "$T" ]; then export PATH="$PATH:$(dirname "$T")"; fi
+          export PATH="$PATH:/opt/devkitpro/tools/bin"
+          command -v 3gxtool || echo "3gxtool NOT FOUND"
           if [ -f main.cpp ]; then cp main.cpp tpl/Sources/main.cpp; else cp Sources/main.cpp tpl/Sources/main.cpp; fi
           cd tpl
           make
