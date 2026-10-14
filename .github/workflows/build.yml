@@ -14,6 +14,7 @@ jobs:
       - name: Install git and libctrpf
         run: |
           (command -v git >/dev/null || (apt-get update && apt-get install -y git))
+          grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf '\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n' >> /opt/devkitpro/pacman/etc/pacman.conf
           dkp-pacman -Sy --noconfirm libctrpf
 
       - name: Get CTRPluginFramework BlankTemplate
