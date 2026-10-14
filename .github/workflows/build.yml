@@ -7,33 +7,48 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container: devkitpro/devkitarm
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install git and 3gxtool
-        run: |
-          (command -v git >/dev/null || (apt-get update && apt-get install -y git))
-          grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf '\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n' >> /opt/devkitpro/pacman/etc/pacman.conf
-          # libctrpf is installed only to get 3gxtool; the build itself uses the template's bundled old Lib/
-          dkp-pacman -Sy --noconfirm libctrpf
-          dkp-pacman -S --noconfirm 3gxtool || true
-          find / -iname '3gxtool*' -not -path '*/proc/*' 2>/dev/null | head || true
 
       - name: Get Nanquitas BlankTemplate (old CTRPF bundled in Lib/)
         run: |
           git clone --depth 1 https://github.com/Nanquitas/CTRPluginFramework-BlankTemplate.git yw3mapwarp
-          ls -la yw3mapwarp yw3mapwarp/Sources yw3mapwarp/Lib
-
-      - name: Build
-        run: |
-          T=$(find / -type f -name 3gxtool -not -path '/proc/*' 2>/dev/null | head -1)
-          if [ -n "$T" ]; then export PATH="$PATH:$(dirname "$T")"; fi
-          export PATH="$PATH:/opt/devkitpro/tools/bin"
-          command -v 3gxtool || echo "3gxtool NOT FOUND"
           if [ -f main.cpp ]; then cp main.cpp yw3mapwarp/Sources/main.cpp; else cp Sources/main.cpp yw3mapwarp/Sources/main.cpp; fi
-          cd yw3mapwarp
-          make
+          ls -la yw3mapwarp yw3mapwarp/Lib
+          grep -n 3gxtool yw3mapwarp/Makefile || true
+
+      - name: Get 3gxtool from the current devkitARM image
+        run: |
+          mkdir -p tools
+          docker run --rm -v "$PWD/tools:/out" devkitpro/devkitarm bash -c '
+            grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf "\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n" >> /opt/devkitpro/pacman/etc/pacman.conf
+            dkp-pacman -Sy --noconfirm libctrpf
+            dkp-pacman -S --noconfirm 3gxtool || true
+            T=$(find / -type f -name 3gxtool -not -path "/proc/*" 2>/dev/null | head -1)
+            echo "3gxtool found at: $T"
+            cp "$T" /out/3gxtool
+          '
+          chmod +x tools/3gxtool
+          ls -la tools
+
+      - name: Build with the old devkitARM image (matches the old CTRPF library)
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work/yw3mapwarp nanquitas/devkitarm bash -c '
+            export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
+            export DEVKITARM=${DEVKITARM:-$DEVKITPRO/devkitARM}
+            export PATH="$PATH:$DEVKITPRO/tools/bin:/work/tools"
+            echo "DEVKITPRO=$DEVKITPRO"; ls $DEVKITPRO || true
+            command -v 3gxtool || echo "3gxtool NOT FOUND in old image"
+            make
+          ' || echo "make in old image did not finish; trying to finish the 3gx separately"
+
+      - name: Finish the 3gx with the current image if needed
+        run: |
+          if ls yw3mapwarp/*.3gx >/dev/null 2>&1; then echo "3gx already built"; exit 0; fi
+          test -f yw3mapwarp/yw3mapwarp.elf || { echo "elf is missing: the build itself failed (see the step above)"; exit 1; }
+          docker run --rm -v "$PWD:/work" -w /work/yw3mapwarp devkitpro/devkitarm \
+            /work/tools/3gxtool -s yw3mapwarp.elf CTRPluginFramework.plgInfo yw3mapwarp.3gx
+          ls -la yw3mapwarp
 
       - name: Upload 3gx
         uses: actions/upload-artifact@v4
