@@ -11,21 +11,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install git, libctrpf and 3gxtool
+      - name: Install git and 3gxtool
         run: |
           (command -v git >/dev/null || (apt-get update && apt-get install -y git))
           grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf '\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n' >> /opt/devkitpro/pacman/etc/pacman.conf
+          # libctrpf is installed only to get 3gxtool; the build itself uses the template's bundled old Lib/
           dkp-pacman -Sy --noconfirm libctrpf
-          echo "--- search 3gx packages ---"
-          dkp-pacman -Ss 3gx || true
           dkp-pacman -S --noconfirm 3gxtool || true
-          echo "--- 3gxtool location ---"
           find / -iname '3gxtool*' -not -path '*/proc/*' 2>/dev/null | head || true
 
-      - name: Get CTRPluginFramework BlankTemplate
+      - name: Get Nanquitas BlankTemplate (old CTRPF bundled in Lib/)
         run: |
-          git clone --depth 1 https://github.com/PabloMK7/CTRPluginFramework-BlankTemplate.git tpl
-          ls -la tpl tpl/Sources
+          git clone --depth 1 https://github.com/Nanquitas/CTRPluginFramework-BlankTemplate.git yw3mapwarp
+          ls -la yw3mapwarp yw3mapwarp/Sources yw3mapwarp/Lib
 
       - name: Build
         run: |
@@ -33,12 +31,12 @@ jobs:
           if [ -n "$T" ]; then export PATH="$PATH:$(dirname "$T")"; fi
           export PATH="$PATH:/opt/devkitpro/tools/bin"
           command -v 3gxtool || echo "3gxtool NOT FOUND"
-          if [ -f main.cpp ]; then cp main.cpp tpl/Sources/main.cpp; else cp Sources/main.cpp tpl/Sources/main.cpp; fi
-          cd tpl
+          if [ -f main.cpp ]; then cp main.cpp yw3mapwarp/Sources/main.cpp; else cp Sources/main.cpp yw3mapwarp/Sources/main.cpp; fi
+          cd yw3mapwarp
           make
 
       - name: Upload 3gx
         uses: actions/upload-artifact@v4
         with:
           name: yw3_mapwarp
-          path: tpl/*.3gx
+          path: yw3mapwarp/*.3gx
