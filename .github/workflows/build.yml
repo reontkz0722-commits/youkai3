@@ -18,26 +18,19 @@ jobs:
           echo "=== Makefile ==="
           cat yw3mapwarp/Makefile
 
-      - name: Build the ORIGINAL 3gxtool (Nanquitas, makes 3GX$0001) from source
+      - name: Build the ORIGINAL 3gxtool (Nanquitas, makes 3GX$0001) for Linux
         continue-on-error: true
         run: |
+          sudo apt-get update
+          sudo apt-get install -y libyaml-cpp-dev
           git clone --depth 1 https://github.com/Nanquitas/3gxtool.git tool_src
-          ls -la tool_src
-          cd tool_src
-          mkdir -p ../tools
-          if [ -f Makefile ] || [ -f makefile ]; then
-            make -j2 || true
-          elif [ -f CMakeLists.txt ]; then
-            cmake -S . -B build && cmake --build build -j2 || true
-          fi
-          T=$(find . -type f -name 3gxtool -perm -u+x | head -1)
-          if [ -z "$T" ]; then
-            echo "no binary from make/cmake; compiling all .cpp files directly"
-            g++ -std=c++17 -O2 -I. $(find . -name '*.cpp' -not -path './build/*') -o ../tools/3gxtool_old
-          else
-            cp "$T" ../tools/3gxtool_old
-          fi
-          ls -la ../tools
+          ls -la tool_src tool_src/sources tool_src/includes
+          mkdir -p tools shim
+          # the repo ships a Windows-only yaml-cpp; use the system one through a tiny shim header
+          echo '#include <yaml-cpp/yaml.h>' > shim/yaml.h
+          g++ -std=gnu++17 -O2 -w -I"$PWD/shim" -I"$PWD/tool_src/includes" \
+              tool_src/sources/*.cpp -o tools/3gxtool_old -lyaml-cpp
+          ls -la tools
 
       - name: Get newer 3gxtool from the current devkitARM image (fallback, makes 3GX$0002)
         continue-on-error: true
@@ -88,7 +81,7 @@ jobs:
           test -f dummy_args.txt || { echo "the Makefile never called 3gxtool"; exit 1; }
           NEWARGS=""
           for t in $(tail -1 dummy_args.txt | sed 's/^3gxtool args: //'); do
-            b=$(basename "$t")
+            b=$(basename -- "$t")
             if [ -f "captured/$b" ]; then t="$PWD/captured/$b"; else t="${t/\/work\//$PWD/}"; fi
             NEWARGS="$NEWARGS $t"
           done
