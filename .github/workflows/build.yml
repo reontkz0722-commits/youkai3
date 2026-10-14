@@ -22,13 +22,12 @@ jobs:
           mkdir -p tools
           docker run --rm -v "$PWD/tools:/out" devkitpro/devkitarm bash -c '
             grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf "\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n" >> /opt/devkitpro/pacman/etc/pacman.conf
-            dkp-pacman -Sy --noconfirm libctrpf
-            dkp-pacman -S --noconfirm 3gxtool || true
+            dkp-pacman -Sy --noconfirm 3gxtool || dkp-pacman -S --noconfirm 3gxtool || true
             T=$(find / -type f -name 3gxtool -not -path "/proc/*" 2>/dev/null | head -1)
             echo "3gxtool found at: $T"
             cp "$T" /out/3gxtool
+            chmod 755 /out/3gxtool
           '
-          chmod +x tools/3gxtool
           ls -la tools
 
       - name: Build with the old devkitARM image (matches the old CTRPF library)
@@ -49,6 +48,9 @@ jobs:
           docker run --rm -v "$PWD:/work" -w /work/yw3mapwarp devkitpro/devkitarm \
             /work/tools/3gxtool -s yw3mapwarp.elf CTRPluginFramework.plgInfo yw3mapwarp.3gx
           ls -la yw3mapwarp
+
+      - name: Fix file ownership
+        run: sudo chown -R "$(id -u):$(id -g)" . || true
 
       - name: Upload 3gx
         uses: actions/upload-artifact@v4
