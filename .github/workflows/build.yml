@@ -17,40 +17,69 @@ jobs:
           ls -la yw3mapwarp yw3mapwarp/Lib
           grep -n 3gxtool yw3mapwarp/Makefile || true
 
-      - name: Get 3gxtool from the current devkitARM image
+      - name: Build the ORIGINAL 3gxtool (Nanquitas) from source
+        continue-on-error: true
+        run: |
+          git clone --depth 1 https://github.com/Nanquitas/3gxtool.git tool_src
+          ls -la tool_src
+          cd tool_src
+          mkdir -p ../tools
+          if [ -f Makefile ] || [ -f makefile ]; then
+            make -j2 || true
+          elif [ -f CMakeLists.txt ]; then
+            cmake -S . -B build && cmake --build build -j2 || true
+          fi
+          T=$(find . -type f -name 3gxtool -perm -u+x | head -1)
+          if [ -z "$T" ]; then
+            echo "no binary from make/cmake; compiling all .cpp files directly"
+            g++ -std=c++17 -O2 -I. $(find . -name '*.cpp' -not -path './build/*') -o ../tools/3gxtool_old
+          else
+            cp "$T" ../tools/3gxtool_old
+          fi
+          ls -la ../tools
+
+      - name: Get newer 3gxtool from the current devkitARM image (fallback)
+        continue-on-error: true
         run: |
           mkdir -p tools
           docker run --rm -v "$PWD/tools:/out" devkitpro/devkitarm bash -c '
             grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf "\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n" >> /opt/devkitpro/pacman/etc/pacman.conf
             dkp-pacman -Sy --noconfirm 3gxtool || dkp-pacman -S --noconfirm 3gxtool || true
             T=$(find / -type f -name 3gxtool -not -path "/proc/*" 2>/dev/null | head -1)
-            echo "3gxtool found at: $T"
-            cp "$T" /out/3gxtool
-            chmod 755 /out/3gxtool
+            cp "$T" /out/3gxtool_new
+            chmod 755 /out/3gxtool_new
           '
           ls -la tools
 
-      - name: Build with the old devkitARM image (matches the old CTRPF library)
+      - name: Compile with the old devkitARM image (matches the old CTRPF library)
         run: |
+          mkdir -p dummy
+          printf '#!/bin/sh\nfor a; do last="$a"; done\n: > "$last"\nexit 0\n' > dummy/3gxtool
+          chmod 755 dummy/3gxtool
           docker run --rm -v "$PWD:/work" -w /work/yw3mapwarp nanquitas/devkitarm bash -c '
             export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
             export DEVKITARM=${DEVKITARM:-$DEVKITPRO/devkitARM}
-            export PATH="$PATH:$DEVKITPRO/tools/bin:/work/tools"
-            echo "DEVKITPRO=$DEVKITPRO"; ls $DEVKITPRO || true
-            command -v 3gxtool || echo "3gxtool NOT FOUND in old image"
+            export PATH="/work/dummy:$PATH"
             make
-          ' || echo "make in old image did not finish; trying to finish the 3gx separately"
-
-      - name: Finish the 3gx with the current image if needed
-        run: |
-          if ls yw3mapwarp/*.3gx >/dev/null 2>&1; then echo "3gx already built"; exit 0; fi
-          test -f yw3mapwarp/yw3mapwarp.elf || { echo "elf is missing: the build itself failed (see the step above)"; exit 1; }
-          docker run --rm -v "$PWD:/work" -w /work/yw3mapwarp devkitpro/devkitarm \
-            /work/tools/3gxtool -s yw3mapwarp.elf CTRPluginFramework.plgInfo yw3mapwarp.3gx
+          '
           ls -la yw3mapwarp
+          rm -f yw3mapwarp/yw3mapwarp.3gx
 
-      - name: Fix file ownership
-        run: sudo chown -R "$(id -u):$(id -g)" . || true
+      - name: Make the real 3gx
+        run: |
+          sudo chown -R "$(id -u):$(id -g)" . || true
+          cd yw3mapwarp
+          test -f yw3mapwarp.elf || { echo "elf is missing"; exit 1; }
+          for TOOL in ../tools/3gxtool_old ../tools/3gxtool_new; do
+            [ -x "$TOOL" ] || continue
+            echo "=== trying $TOOL ==="
+            if "$TOOL" -s yw3mapwarp.elf CTRPluginFramework.plgInfo yw3mapwarp.3gx && [ -s yw3mapwarp.3gx ]; then
+              echo "OK with $TOOL"; break
+            fi
+            rm -f yw3mapwarp.3gx
+          done
+          ls -la
+          test -s yw3mapwarp.3gx
 
       - name: Upload 3gx
         uses: actions/upload-artifact@v4
