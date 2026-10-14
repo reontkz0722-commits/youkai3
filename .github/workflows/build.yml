@@ -19,7 +19,7 @@ jobs:
 
       - name: Get CTRPluginFramework BlankTemplate
         run: |
-          git clone --depth 1 https://github.com/Nanquitas/CTRPluginFrameworkBlankTemplate.git tpl
+          git clone --depth 1 https://github.com/PabloMK7/CTRPluginFramework-BlankTemplate.git tpl
           ls -la tpl tpl/Sources
 
       - name: Build
