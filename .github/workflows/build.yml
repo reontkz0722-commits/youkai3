@@ -54,7 +54,17 @@ jobs:
       - name: Compile with the old devkitARM image (matches the old CTRPF library)
         run: |
           mkdir -p dummy
-          printf '#!/bin/sh\nfor a; do last="$a"; done\n: > "$last"\nexit 0\n' > dummy/3gxtool
+          cat > dummy/3gxtool <<'DUMMY'
+          #!/bin/sh
+          # fake 3gxtool: keep a copy of the ELF (make deletes it afterwards) and log the real arguments
+          echo "3gxtool args: $*" >> /work/dummy_args.txt
+          for a; do
+            case "$a" in *.elf) cp "$a" /work/saved.elf ;; esac
+            last="$a"
+          done
+          : > "$last"
+          exit 0
+          DUMMY
           chmod 755 dummy/3gxtool
           docker run --rm -v "$PWD:/work" -w /work/yw3mapwarp nanquitas/devkitarm bash -c '
             export DEVKITPRO=${DEVKITPRO:-/opt/devkitpro}
@@ -62,18 +72,20 @@ jobs:
             export PATH="/work/dummy:$PATH"
             make
           '
-          ls -la yw3mapwarp
+          echo "--- real 3gxtool arguments used by the Makefile ---"
+          cat dummy_args.txt || true
+          ls -la . yw3mapwarp
           rm -f yw3mapwarp/yw3mapwarp.3gx
 
       - name: Make the real 3gx
         run: |
           sudo chown -R "$(id -u):$(id -g)" . || true
+          test -f saved.elf || { echo "saved.elf is missing: the compile step did not reach the 3gxtool call"; exit 1; }
           cd yw3mapwarp
-          test -f yw3mapwarp.elf || { echo "elf is missing"; exit 1; }
           for TOOL in ../tools/3gxtool_old ../tools/3gxtool_new; do
             [ -x "$TOOL" ] || continue
             echo "=== trying $TOOL ==="
-            if "$TOOL" -s yw3mapwarp.elf CTRPluginFramework.plgInfo yw3mapwarp.3gx && [ -s yw3mapwarp.3gx ]; then
+            if "$TOOL" -s ../saved.elf CTRPluginFramework.plgInfo yw3mapwarp.3gx && [ -s yw3mapwarp.3gx ]; then
               echo "OK with $TOOL"; break
             fi
             rm -f yw3mapwarp.3gx
