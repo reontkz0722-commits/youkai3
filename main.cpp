@@ -1147,6 +1147,12 @@ namespace CTRPluginFramework
         Process::Write32(addr, raw);
     }
 
+    // Controller::IsKeyDown は数値ではなく Key 型を受け取るので、数値のキーマスクを変換して呼ぶ
+    static bool KeyDown(u32 mask)
+    {
+        return Controller::IsKeyDown((Key)mask);
+    }
+
     // 毎フレーム呼ばれる(エントリを有効にしている間)
     static void MoveFrame(MenuEntry *entry)
     {
@@ -1154,20 +1160,20 @@ namespace CTRPluginFramework
             Process::Write32(AIR_ADDR, AIR_PATCH);
         if (g_slowFall)
             Process::Write8(SLOWFALL_ADDR, 1);
-        if (g_coordMove && Controller::IsKeyDown(0x02)) // B + 十字キーで座標を直接動かす(壁抜け)
+        if (g_coordMove && KeyDown(0x02)) // B + 十字キーで座標を直接動かす(壁抜け)
         {
             float cs = (float)g_coordSpeed;
-            if (Controller::IsKeyDown(0x10)) AddToFloat(PLAYER_X_ADDR,  cs); // 右
-            if (Controller::IsKeyDown(0x20)) AddToFloat(PLAYER_X_ADDR, -cs); // 左
-            if (Controller::IsKeyDown(0x80)) AddToFloat(PLAYER_Z_ADDR,  cs); // 下
-            if (Controller::IsKeyDown(0x40)) AddToFloat(PLAYER_Z_ADDR, -cs); // 上
+            if (KeyDown(0x10)) AddToFloat(PLAYER_X_ADDR,  cs); // 右
+            if (KeyDown(0x20)) AddToFloat(PLAYER_X_ADDR, -cs); // 左
+            if (KeyDown(0x80)) AddToFloat(PLAYER_Z_ADDR,  cs); // 下
+            if (KeyDown(0x40)) AddToFloat(PLAYER_Z_ADDR, -cs); // 上
         }
         if (g_moonJump)
         {
             float sp = (float)g_moonSpeed;
-            if (Controller::IsKeyDown(0x8000))      // ZR: 上昇
+            if (KeyDown(0x8000))      // ZR: 上昇
                 AddToFloat(PLAYER_Y_ADDR, sp);
-            else if (Controller::IsKeyDown(0x4000)) // ZL: 下降(元は速度の2倍)
+            else if (KeyDown(0x4000)) // ZL: 下降(元は速度の2倍)
                 AddToFloat(PLAYER_Y_ADDR, -2.0f * sp);
         }
     }
