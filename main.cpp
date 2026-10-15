@@ -3,9 +3,11 @@
 //
 // 動作: メニューで行き先とキャラを選び、ホットキーを押している間、
 //       次マップIDのアドレスへ行き先IDを書き込む(ARコードと同じ動き)。
-// アドレス: AR の「D3000000 0B000000」+ 下位アドレスを足した値
-//   ケータ        : 0x0B7266E4  (AR: 007266E4)
-//   もう一人       : 0x0BE266E4  (AR: 00E266E4)
+// アドレス(New3DS用・wikiのNEW用ARコード): オフセット指定なしの絶対アドレス
+//   ケータ : 0x0C3266E4
+//   イナホ : 0x0C3268F4
+// Old3DS用は D3000000 08000000 + 007266E4(ケータ) / 007268F4(イナホ)
+// ※ ARコードの先頭ブロック(F0000001 / F1000000 …)は、書き込みのない空ブロックなので省いている
 
 #include <3ds.h>
 #include "csvc.h"
@@ -468,11 +470,26 @@ namespace CTRPluginFramework
     // ---- 状態 ----
     static u32         g_destId   = 0x91487158;
     static std::string g_destName = "t201g00 Old Springdale [unused]";
-    static u32         g_addr     = 0x0B7266E4; // ケータ
-    static int         g_hotkey   = 0;
+    static int         g_char     = 0;           // 0 = ケータ, 1 = イナホ
+    static int         g_layout   = 1;           // 0 = 旧式9スロット(Old3DS用), 1 = 新式1か所(New3DS用・初期値), 2 = 手入力アドレス
+    static u32         g_base     = 0x0B000000;
+    static u32         g_custom   = 0x0B7266E4;
+    static int         g_hotkey   = 5;           // 5 = A+B (ARコードと同じ)
 
-    static const u32 ADDR_KEITA = 0x0B7266E4;
-    static const u32 ADDR_OTHER = 0x0BE266E4;
+    // Old3DS用ARコードにあった書き込み先(下位アドレス)。先頭だけがキャラごとに違う
+    static const u32 LOW_KEITA[9] =
+    {
+        0x007266E4, 0x00728548, 0x0072DE58, 0x0072DEA8, 0x008EFB80,
+        0x008F1C30, 0x008F4F8C, 0x00A909AC, 0x00C93B4C
+    };
+    static const u32 LOW_INAHO[9] =
+    {
+        0x007268F4, 0x00728548, 0x0072DE58, 0x0072DEA8, 0x008EFB80,
+        0x008F1C30, 0x008F4F8C, 0x00A909AC, 0x00C93B4C
+    };
+    // New3DS用ARコードにあった書き込み先(0C3266E4 / 0C3268F4、オフセットなし)
+    static const u32 NEW_KEITA = 0x0C3266E4;
+    static const u32 NEW_INAHO = 0x0C3268F4;
 
     static u32 HotkeyMask(int idx)
     {
@@ -503,6 +520,13 @@ namespace CTRPluginFramework
         return std::string(b);
     }
 
+    static std::string Dec(int v)
+    {
+        char b[16];
+        snprintf(b, sizeof(b), "%d", v);
+        return std::string(b);
+    }
+
     // アドレスの今の値と、一覧にあるマップ名を文字列にする(診断用)
     static std::string DescribeAddr(u32 addr)
     {
@@ -520,6 +544,49 @@ namespace CTRPluginFramework
         k.Open();
     }
 
+    // 選んでいるキャラの全スロットを、base 0B000000 と 08000000 の両方で表示(* = 一覧にあるマップID)
+    static void ShowSlots(void)
+    {
+        const u32 *low = (g_char == 0) ? LOW_KEITA : LOW_INAHO;
+        const u32 bases[2] = {0x0B000000, 0x08000000};
+        for (int b = 0; b < 2; b++)
+        {
+            std::string t = "Base " + Hex8(bases[b]) + (g_char == 0 ? " Keita" : " Inaho") + " (* = known map ID)\n";
+            for (int i = 0; i < 9; i++)
+            {
+                u32 v = 0;
+                bool ok = Process::Read32(bases[b] + low[i], v);
+                t += Hex8(low[i]) + ": " + (ok ? Hex8(v) : std::string("READ FAILED")) + ((ok && MapNameOf(v)) ? " *" : "") + "\n";
+            }
+            ShowInfo(t);
+        }
+        ShowInfo("New-style addresses:\n"
+                 "Keita " + DescribeAddr(NEW_KEITA) + "\n"
+                 "Inaho " + DescribeAddr(NEW_INAHO) + "\n"
+                 "Custom " + DescribeAddr(g_custom));
+    }
+
+    // 選んでいる方式で行き先IDを書き込む。成功した書き込み数を返す
+    static int DoWrite(u32 id, u32 &firstAddr)
+    {
+        int ok = 0;
+        if (g_layout == 0)
+        {
+            const u32 *low = (g_char == 0) ? LOW_KEITA : LOW_INAHO;
+            firstAddr = g_base + low[0];
+            for (int i = 0; i < 9; i++)
+                if (Process::Write32(g_base + low[i], id))
+                    ok++;
+        }
+        else
+        {
+            firstAddr = (g_layout == 1) ? (g_char == 0 ? NEW_KEITA : NEW_INAHO) : g_custom;
+            if (Process::Write32(firstAddr, id))
+                ok = 1;
+        }
+        return ok;
+    }
+
     static bool g_wasDown = false;
 
     // 毎フレーム呼ばれる。ホットキーを押している間だけ書き込む(ARの DD000000 と同じ)
@@ -528,9 +595,10 @@ namespace CTRPluginFramework
         bool down = Controller::IsKeysDown(HotkeyMask(g_hotkey));
         if (down)
         {
-            bool ok = Process::Write32(g_addr, g_destId);
+            u32 first = 0;
+            int ok = DoWrite(g_destId, first);
             if (!g_wasDown) // 押した瞬間だけ結果を表示
-                OSD::Notify(std::string(ok ? "write ok  " : "write FAILED  ") + DescribeAddr(g_addr));
+                OSD::Notify("write ok " + Dec(ok) + "  " + DescribeAddr(first));
         }
         g_wasDown = down;
     }
@@ -595,17 +663,22 @@ namespace CTRPluginFramework
         {
             "L+R", "L+Up", "L+Down", "L+Left", "L+Right", "A+B", "X+Y"
         };
+        static const char *layoutNames[] =
+        {
+            "Old-style 9 slots (low addr + base)", "New-style single address", "Custom address"
+        };
 
         for (;;)
         {
-            std::string who = (g_addr == ADDR_KEITA) ? "Keita" : (g_addr == ADDR_OTHER ? "Other" : "Custom");
             std::vector<std::string> opts =
             {
                 "Destination: " + g_destName,
-                "Character: " + who + " (" + Hex8(g_addr) + ")",
+                std::string("Character: ") + (g_char == 0 ? "Keita" : "Inaho"),
+                std::string("Layout: ") + layoutNames[g_layout],
+                "Base offset: " + Hex8(g_base),
                 std::string("Hotkey: ") + hotkeyNames[g_hotkey],
-                "Check: show current values at addresses",
-                "Set custom address (hex)",
+                "Check: show current values",
+                "Set custom address (hex): " + Hex8(g_custom),
             };
             Keyboard kb("Map Warp (hold hotkey, then trigger a map load)", opts);
             int r = kb.Open();
@@ -616,33 +689,52 @@ namespace CTRPluginFramework
                 SelectDestination();
             else if (r == 1)
             {
-                std::vector<std::string> chars = {"Keita (0x0B7266E4)", "Other (0x0BE266E4)"};
+                std::vector<std::string> chars = {"Keita", "Inaho"};
                 Keyboard ck("Character", chars);
                 int cr = ck.Open();
-                if (cr == 0) g_addr = ADDR_KEITA;
-                else if (cr == 1) g_addr = ADDR_OTHER;
+                if (cr >= 0) g_char = cr;
             }
             else if (r == 2)
+            {
+                std::vector<std::string> ls(layoutNames, layoutNames + 3);
+                Keyboard lk("Layout", ls);
+                int lr = lk.Open();
+                if (lr >= 0) g_layout = lr;
+            }
+            else if (r == 3)
+            {
+                std::vector<std::string> bs = {"0x0B000000", "0x08000000", "Hex input"};
+                Keyboard bk("Base offset (old-style slots)", bs);
+                int br = bk.Open();
+                if (br == 0) g_base = 0x0B000000;
+                else if (br == 1) g_base = 0x08000000;
+                else if (br == 2)
+                {
+                    u32 v = g_base;
+                    Keyboard hex("Base offset (hex)");
+                    hex.IsHexadecimal(true);
+                    if (hex.Open(v, g_base) >= 0)
+                        g_base = v;
+                }
+            }
+            else if (r == 4)
             {
                 std::vector<std::string> hk(hotkeyNames, hotkeyNames + 7);
                 Keyboard hk2("Hotkey", hk);
                 int hr = hk2.Open();
                 if (hr >= 0) g_hotkey = hr;
             }
-            else if (r == 3)
+            else if (r == 5)
             {
-                ShowInfo("Current values (stand in a normal map first):\n"
-                         "Keita  " + DescribeAddr(ADDR_KEITA) + "\n"
-                         "Other  " + DescribeAddr(ADDR_OTHER) + "\n"
-                         "Custom " + DescribeAddr(g_addr));
+                ShowSlots();
             }
-            else if (r == 4)
+            else if (r == 6)
             {
-                u32 v = g_addr;
+                u32 v = g_custom;
                 Keyboard hex("Address (hex)");
                 hex.IsHexadecimal(true);
-                if (hex.Open(v, g_addr) >= 0)
-                    g_addr = v;
+                if (hex.Open(v, g_custom) >= 0)
+                    g_custom = v;
             }
         }
     }
