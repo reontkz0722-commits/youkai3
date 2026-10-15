@@ -559,19 +559,31 @@ namespace CTRPluginFramework
         Process::Write32(g_trigAddr, raw);
     }
 
-    static bool g_wasDown = false;
+    static bool g_wasDown   = false;
+    static u32  g_lastShown = 0;
 
     // 毎フレーム呼ばれる。ホットキーを押している間だけ実行する(ARの DD000000 と同じ)
+    // 診断: 書き込む直前の値を読み、押した瞬間と「ゲームが値を書き換えた時」だけ画面に出す
     static void MapWarpFrame(MenuEntry *entry)
     {
         bool down = Controller::IsKeysDown(HotkeyMask(g_hotkey));
         if (down)
         {
+            u32 addr = TargetAddr();
+
+            u32 pre = 0;
+            bool rd = Process::Read32(addr, pre);
+            if (rd && (!g_wasDown || (pre != g_destId && pre != g_lastShown)))
+            {
+                const char *n = MapNameOf(pre);
+                OSD::Notify(std::string(g_wasDown ? "game changed slot: " : "slot before: ") + Hex8(pre) + (n ? std::string(" ") + n : std::string("")));
+                g_lastShown = pre;
+            }
+
             if (g_trigOn)
                 DoTrigger();
-            u32 addr = TargetAddr();
             bool ok = Process::Write32(addr, g_destId);
-            if (!g_wasDown) // 押した瞬間だけ結果を表示
+            if (!g_wasDown)
                 OSD::Notify(std::string(ok ? "write ok  " : "write FAILED  ") + DescribeAddr(addr));
         }
         g_wasDown = down;
