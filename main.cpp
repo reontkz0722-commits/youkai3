@@ -1113,6 +1113,7 @@ namespace CTRPluginFramework
     static bool g_moonJump  = false;
     static u32  g_moonSpeed = 5; // 元のプラグインの初期値
     static bool g_coordMove = false;
+    static bool g_showCoords = false; // 画面に座標を表示するか
     static u32  g_coordSpeed = 5; // 元のプラグインの初期値
 
     static void SetAirWalk(bool on)
@@ -1190,6 +1191,7 @@ namespace CTRPluginFramework
                 "Moon jump speed: " + Dec(g_moonSpeed),
                 std::string("Coordinate move / noclip (B + D-pad): ") + (g_coordMove ? "ON" : "OFF"),
                 "Coordinate move speed: " + Dec(g_coordSpeed),
+                std::string("Show coordinates on screen: ") + (g_showCoords ? "ON" : "OFF"),
             };
             Keyboard kb("Movement (entry must be enabled)", opts);
             int r = kb.Open();
@@ -1218,7 +1220,37 @@ namespace CTRPluginFramework
                 if (sk.Open(v, g_coordSpeed) >= 0 && v > 0 && v < 1000)
                     g_coordSpeed = v;
             }
+            else if (r == 6)
+                g_showCoords = !g_showCoords;
         }
+    }
+
+    // 画面(上画面)に今の座標と、マップIDの枠の値を毎フレーム描く
+    static bool CoordOSD(const Screen &screen)
+    {
+        if (!g_showCoords || !screen.IsTop)
+            return false;
+
+        float x = 0.0f, y = 0.0f, z = 0.0f;
+        bool ok = Process::ReadFloat(PLAYER_X_ADDR, x)
+               && Process::ReadFloat(PLAYER_Y_ADDR, y)
+               && Process::ReadFloat(PLAYER_Z_ADDR, z);
+
+        char line[64];
+        if (ok)
+            snprintf(line, sizeof(line), "X:%.1f Y:%.1f Z:%.1f", x, y, z);
+        else
+            snprintf(line, sizeof(line), "coords: read failed");
+        u32 py = screen.Draw(line, 8, 8);
+
+        u32 id = 0;
+        if (Process::Read32(TargetAddr(), id))
+        {
+            const char *n = MapNameOf(id);
+            std::string m = "Map: " + Hex8(id) + (n ? std::string(" ") + n : std::string(""));
+            screen.Draw(m, 8, py);
+        }
+        return true;
     }
 
     void PatchProcess(FwkSettings &settings)
@@ -1243,6 +1275,8 @@ namespace CTRPluginFramework
 
         menu->Append(new MenuEntry("Movement", MoveFrame, MoveMenu,
             "Air walk / slow fall / moon jump (ZR up, ZL down) / B + D-pad coordinate move. Enable, then open settings."));
+
+        OSD::Run(CoordOSD);
 
         menu->Run();
         delete menu;
