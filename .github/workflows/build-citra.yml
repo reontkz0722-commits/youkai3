@@ -1,0 +1,44 @@
+name: build-3gx-citra
+
+# Citra / Azahar 用: 新形式 (3GX$0002) の3gxを、新しいCTRPluginFramework + 3gxtool 1.3 でビルドする
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: devkitpro/devkitarm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install git, libctrpf and 3gxtool
+        run: |
+          (command -v git >/dev/null || (apt-get update && apt-get install -y git))
+          grep -Fxq "[thepixellizeross-lib]" /opt/devkitpro/pacman/etc/pacman.conf || printf '\n[thepixellizeross-lib]\nServer = https://thepixellizeross.gitlab.io/packages/any\nSigLevel = Optional\n\n[thepixellizeross-linux]\nServer = https://thepixellizeross.gitlab.io/packages/x86_64/linux\nSigLevel = Optional\n' >> /opt/devkitpro/pacman/etc/pacman.conf
+          dkp-pacman -Sy --noconfirm libctrpf || true
+          dkp-pacman -S --noconfirm libctrpf 3gxtool || dkp-pacman -S --noconfirm libctrpf || true
+          dkp-pacman -S --noconfirm 3gxtool || true
+          find / -iname '3gxtool*' -not -path '*/proc/*' 2>/dev/null | head || true
+
+      - name: Get the CTRPluginFramework BlankTemplate (PabloMK7)
+        run: |
+          git clone --depth 1 https://github.com/PabloMK7/CTRPluginFramework-BlankTemplate.git yw2shinuchi
+          if [ -f main.cpp ]; then cp main.cpp yw2shinuchi/Sources/main.cpp; else cp Sources/main.cpp yw2shinuchi/Sources/main.cpp; fi
+          ls -la yw2shinuchi yw2shinuchi/Sources
+
+      - name: Build
+        run: |
+          T=$(find / -type f -name 3gxtool -not -path '/proc/*' 2>/dev/null | head -1)
+          if [ -n "$T" ]; then export PATH="$PATH:$(dirname "$T")"; fi
+          export PATH="$PATH:/opt/devkitpro/tools/bin"
+          command -v 3gxtool || echo "3gxtool NOT FOUND"
+          cd yw2shinuchi
+          make
+          ls -la
+          head -c 8 yw2shinuchi.3gx; echo
+
+      - name: Upload 3gx
+        uses: actions/upload-artifact@v4
+        with:
+          name: yw2_shinuchi_citra
+          path: yw2shinuchi/*.3gx
