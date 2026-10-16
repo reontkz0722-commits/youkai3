@@ -98,7 +98,7 @@ namespace CTRPluginFramework
         {"t101d03c Mystery Way - Route 2", 0x6BE8A868},
         {"t101d05 Desolate Lane", 0x65F04920},
         {"t101d05c Gold-Gleaming Hwy. - Eastbound", 0x3DB20FEE},
-        {"t101g00 Uptown Springdale", 0x17DC03F6},
+        {"t101g00 桜住宅街 (Uptown Springdale)", 0x17DC03F6},
         {"t101i01 Adams House - 1F", 0x6A451E6A},
         {"t101i02 Adams House - 2F", 0xF34C4FD0},
         {"t101i03 Forester House - 1F", 0x844B7F46},
@@ -118,12 +118,12 @@ namespace CTRPluginFramework
         {"t101i59 Springdale Elementary Gym", 0x19E9621D},
         {"t102d01 Mt. Wildwood Trail", 0x702822D7},
         {"t102d01c Bony Spirits Way - Exit", 0x1E7EB03A},
-        {"t102d02 Mt. Wildwood Summit", 0xE921736D},
+        {"t102d02 山頂 (Mt. Wildwood Summit)", 0xE921736D},
         {"t102d03 Jumbo Slider", 0x9E2643FB},
         {"t102d03c Fleshy Souls Way - Exit", 0x2C48D2B8},
         {"t102d31 Abandoned Tunnel West", 0x5B057114},
         {"t102d32 Abandoned Tunnel East", 0xC20C20AE},
-        {"t102g00 Mt. Wildwood", 0x0569AC18},
+        {"t102g00 大森山 (Mt. Wildwood)", 0x0569AC18},
         {"t102i01 Deserted House", 0x78F0B184},
         {"t102i02 Deserted House (2?)", 0xE1F9E03E},
         {"t102i21 Shrine Behind the Waterfall", 0x4AC6D306},
@@ -152,7 +152,7 @@ namespace CTRPluginFramework
         {"t103d54 Divine Paradise - 5F", 0xC5894578},
         {"t103d55 Divine Paradise - 6F", 0xB28E75EE},
         {"t103d56 Infinite Inferno - Time-Out Room (2?)", 0x2B872454},
-        {"t103g00 Blossom Heights", 0xBDD5CB7D},
+        {"t103g00 団々坂 (Blossom Heights)", 0xBDD5CB7D},
         {"t103i01 Bernstein House - 1F", 0xC04CD6E1},
         {"t103i02 Bernstein House - 2F", 0x5945875B},
         {"t103i03 Bernstein House - 3F", 0x2E42B7CD},
@@ -166,7 +166,7 @@ namespace CTRPluginFramework
         {"t103i35 Chloro-Phil Good", 0xEC0C413B},
         {"t103i37 Springdale Hot Springs - Lobby", 0x02022017},
         {"t103i38 Springdale Hot Springs - Men", 0x92BD3D86},
-        {"t103i39 Springdale Hot Springs - Women", 0xE5BA0D10},
+        {"t103i39 さくらの湯 女湯 (Springdale Hot Springs - Women)", 0xE5BA0D10},
         {"t103i51 Byrd House - Main Room", 0xBD3B22A4},
         {"t103i53 Byrd House - Hidden Room", 0x53354388},
         {"t103i60 Wayfarer Manor - Room 101", 0xE11141F1},
@@ -188,7 +188,7 @@ namespace CTRPluginFramework
         {"t104d31", 0x7E6E2EC8},
         {"t104d32", 0xE7677F72},
         {"t104d33 Construction Site - 3F", 0x90604FE4},
-        {"t104g00 Downtown Springdale", 0x2002F3C4},
+        {"t104g00 さくら中央シティ (Downtown Springdale)", 0x2002F3C4},
         {"t104i21 Seabreeze Tunnel", 0x6FAD8CDA},
         {"t104i23 Frostia's Place", 0x81A3EDF6},
         {"t104i25 Arcadia Arcade", 0x68C048C3},
@@ -228,7 +228,7 @@ namespace CTRPluginFramework
         {"t105d45 Nocturne Hospital - 3F", 0x8EFE1B73},
         {"t105d47 Hospital - Basement", 0x60F07A5F},
         {"t105d48 Hospital - Basement Lab", 0xF04F67CE},
-        {"t105g00 Shopper's Row", 0x98BE94A1},
+        {"t105g00 おつかい横丁 (Shopper's Row)", 0x98BE94A1},
         {"t105i20 Springdale Flower Road", 0xA016DB29},
         {"t105i21 Settle In Bookstore", 0xD711EBBF},
         {"t105i23 North Wind Ramen", 0x391F8A93},
@@ -262,7 +262,7 @@ namespace CTRPluginFramework
         {"t106d62 Quiz Room - 2F", 0x301943BC},
         {"t106d63 Quiz Room - 3F", 0x471E732A},
         {"t106d64 Quiz Room - Exit", 0xD97AE689},
-        {"t106g00 Breezy Hills", 0x8A0B3B4F},
+        {"t106g00 そよ風ヒルズ (Breezy Hills)", 0x8A0B3B4F},
         {"t106i01 Archer House - 1F", 0xF79226D3},
         {"t106i02 Archer House - 2F", 0x6E9B7769},
         {"t106i05 Stone House", 0xF0FFE2CA},
@@ -272,9 +272,9 @@ namespace CTRPluginFramework
         {"t106i23 Trophy Room", 0x2BAA257D},
         {"t106i51 Wisteria Gardens Parking", 0x8AE5D296},
         {"t106i52 Wisteria Gardens Entrance", 0x13EC832C},
-        {"t107g00 Excellent Tower", 0x32B75C2A},
+        {"t107g00 さくらEXツリー (Excellent Tower)", 0x32B75C2A},
         {"t107i01 Excellent Tower - Entrance", 0x4F2E41B6},
-        {"t107i02 Excellent Tower - Elevator", 0xD627100C},
+        {"t107i02 さくらEXツリー エレベーター (Excellent Tower - Elevator)", 0xD627100C},
         {"t107i03 Observation Deck", 0xA120209A},
         {"t121d01 Briny Grotto", 0x185DDE59},
         {"t121d03 Hidden Workshop", 0xF653BF75},
@@ -287,11 +287,11 @@ namespace CTRPluginFramework
         {"t121d27a Gogo Junction (2?)", 0xAFC67925},
         {"t121d27b Gogo Junction (3?)", 0x36CF289F},
         {"t121d29 Mystery Way - End Point", 0x24B034E9},
-        {"t121d31 Gold-Gleaming Hwy. - Entrance", 0x33708D9A},
+        {"t121d31 金ぴか都市高 (Gold-Gleaming Hwy. - Entrance)", 0x33708D9A},
         {"t121d33 Gold-Gleaming Hwy. - Interchange", 0xDD7EECB6},
         {"t121d35 Gold-Gleaming Hwy. - End Point", 0x341D4983},
         {"t121d41", 0x7C311B5D},
-        {"t121g00 San Fantastico", 0x6D1C5096},
+        {"t121g00 ナギサキ (San Fantastico)", 0x6D1C5096},
         {"t121i01 Rolling Waves Meeting Hall", 0x10854D0A},
         {"t121i03 Rusty's Mart", 0xFE8B2C26},
         {"t121i10 Deserted House", 0x7E994CDD},
@@ -300,7 +300,7 @@ namespace CTRPluginFramework
         {"t131d01c Gold-Gleaming Hwy. - Inner Lane", 0xDF4AB844},
         {"t131d02 Nokotopia", 0xBC34A653},
         {"t131d03 Fullface Rock", 0xCB3396C5},
-        {"t131d03c Bony Spirits Way - Entrance", 0xED7CDAC6},
+        {"t131d03c あやかし通り 新元祖道 (Bony Spirits Way - Entrance)", 0xED7CDAC6},
         {"t131d04 Cicada Canyon", 0x55570366},
         {"t131d05 Mt. Middleton Summit", 0x225033F0},
         {"t131d20 Infinite Tunnel", 0x600CA5FD},
@@ -319,27 +319,27 @@ namespace CTRPluginFramework
         {"t200b41", 0x3C542144},
         {"t200d00 Flatpot Plains", 0x2BB2A864},
         {"t201d01 Fox Shrine Road", 0xE409FF97},
-        {"t201d01c Fleshy Souls Way - Entrance", 0x6836D077},
+        {"t201d01c あやかし通り 新本家道 (Fleshy Souls Way - Entrance)", 0x6836D077},
         {"t201d03 Well Road", 0x0A079EBB},
         {"t201d11 Springdale Ironworks", 0xFD12CED6},
         {"t201d21 Sunset Mfg. Co. - Main Gate", 0xD63F9D15},
         {"t201d23 Sunset Mfg. Co. - Furnace 1", 0x3831FC39},
-        {"t201g00 Old Springdale", 0x91487158},
+        {"t201g00 桜町(過去) (Old Springdale)", 0x91487158},
         {"t201i01 Shoten Temple", 0xECD16CC4},
         {"t201i03 Timers & More", 0x02DF0DE8},
         {"t201i10 Galleria Blvd.", 0x82CD6D13},
         {"t201i20 Prayer's Peak Tunnel", 0xA9E03ED0},
         {"t202g00 Mt. Wildwood Shrine (past)", 0x83FDDEB6},
-        {"t206g00 Gourd Pond (past)", 0x0C9F49E1},
+        {"t206g00 ひょうたん池(過去) (Gourd Pond (past))", 0x0C9F49E1},
         {"t231d01 Rice Paddy", 0xA3A98547},
         {"t231d03 Fullface Rock", 0x4DA7E46B},
         {"t231d04 Cicada Canyon", 0xD3C371C8},
         {"t231d05 Mt. Middleton Summit (past)", 0xA4C4415E},
-        {"t231g00 Old Harrisville", 0xD6E80B88},
+        {"t231g00 ケマモト村(過去) (Old Harrisville)", 0xD6E80B88},
         {"t231i01 Ninja Forest", 0xAB711614},
         {"t231i03 Secret Base", 0x457F7738},
         {"t231i05 Old-Time House", 0xAC1CD20D},
-        {"t232g00 Old Harrisville Station Plaza", 0xC45DA466},
+        {"t232g00 ケマモト村駅(過去) (Old Harrisville Station Plaza)", 0xC45DA466},
         {"t301g00 Sawayama Castle Town", 0x5A14A2FD},
         {"t302g00 Inside Sawayama Castle", 0x48A10D13},
         {"t302i01 Banquet Hall", 0x3538108F},
@@ -405,14 +405,17 @@ namespace CTRPluginFramework
     }
 
     // ================= アドレス(ARコード由来・Old3DS基準) =================
-    // Old3DS用の 08xxxxxx は、New3DS では +0x03C00000 (OLD→NEW変換ツールの規則)。
-    // コード領域(00xxxxxx)は同じ。レイアウトは自動判定(枠のマップIDが読める方を採用)か、手動で選ぶ。
-    static int g_layoutMode = 0; // 0=自動 1=New3DS 2=Old3DS
+    // Old3DS用の 08xxxxxx を基準にして、環境ごとに次のようにずらす(変換ツールの規則):
+    //   New3DS : +0x03C00000      Citra/Azahar : -0x00001000      Old3DS : そのまま
+    // コード領域(00xxxxxx)は同じ。レイアウトは自動判定(枠のマップIDが読める場所)か、手動で選ぶ。
+    static int g_layoutMode = 0; // 0=自動 1=New3DS 2=Old3DS 3=Citra
 
-    static bool NewLayout(void)
+    // 実際に使うレイアウト: 0=Old 1=New 2=Citra
+    static int CurLayout(void)
     {
-        if (g_layoutMode != 0)
-            return g_layoutMode == 1;
+        if (g_layoutMode == 1) return 1;
+        if (g_layoutMode == 2) return 0;
+        if (g_layoutMode == 3) return 2;
         static int cache = -1; // 判定できたら固定する
         if (cache < 0)
         {
@@ -421,15 +424,33 @@ namespace CTRPluginFramework
                 cache = 1;
             else if (Process::Read32(0x08727284, v) && MapNameOf(v))
                 cache = 0;
+            else if (Process::Read32(0x08726284, v) && MapNameOf(v))
+                cache = 2;
             else
-                return true; // まだ判定できない間は New3DS として扱う
+                return 1; // まだ判定できない間は New3DS として扱う
         }
-        return cache == 1;
+        return cache;
+    }
+
+    static const char *LayoutName(void)
+    {
+        switch (CurLayout())
+        {
+            case 0:  return "Old3DS";
+            case 2:  return "Citra";
+            default: return "New3DS";
+        }
     }
 
     static u32 Adj(u32 oldAddr)
     {
-        return (NewLayout() && (oldAddr >> 24) == 0x08) ? oldAddr + 0x03C00000 : oldAddr;
+        u32 top = oldAddr >> 24;
+        if (top < 0x08 || top > 0x0C)
+            return oldAddr; // コード領域などはそのまま
+        int l = CurLayout();
+        if (l == 1) return oldAddr + 0x03C00000;
+        if (l == 2) return oldAddr - 0x1000;
+        return oldAddr;
     }
 
     #define PLAYER_X_ADDR  (Adj(0x08852E10))
@@ -830,8 +851,8 @@ namespace CTRPluginFramework
                 std::string("Trigger (area reload via Y): ") + (g_trigOn ? "ON" : "OFF"),
                 "Trigger address (hex): " + Hex8(TrigAddr()) + (g_trigAddr ? "" : " (default)"),
                 "Check: show current values",
-                std::string("Layout: ") + (g_layoutMode == 0 ? "Auto" : (g_layoutMode == 1 ? "New3DS" : "Old3DS"))
-                    + " (using " + (NewLayout() ? "New" : "Old") + ")",
+                std::string("Layout: ") + (g_layoutMode == 0 ? "Auto" : (g_layoutMode == 1 ? "New3DS" : (g_layoutMode == 2 ? "Old3DS" : "Citra")))
+                    + " (using " + LayoutName() + ")",
             };
             Keyboard kb("Map Warp (hold hotkey, then wait for the load)", opts);
             int r = kb.Open();
@@ -861,14 +882,14 @@ namespace CTRPluginFramework
             }
             else if (r == 6)
             {
-                std::vector<std::string> lm = {"Auto (detect)", "New3DS", "Old3DS"};
-                Keyboard lk("Layout (New = Old + 0x03C00000 for 08xxxxxx)", lm);
+                std::vector<std::string> lm = {"Auto (detect)", "New3DS (+0x03C00000)", "Old3DS", "Citra / Azahar (-0x1000)"};
+                Keyboard lk("Layout (base = Old3DS addresses 08xxxxxx)", lm);
                 int lr = lk.Open();
                 if (lr >= 0) g_layoutMode = lr;
             }
             else if (r == 5)
             {
-                ShowInfo(std::string("Layout: ") + (NewLayout() ? "New3DS" : "Old3DS") + "\n"
+                ShowInfo(std::string("Layout: ") + LayoutName() + "\n"
                          "Slot  " + DescribeAddr(SlotAddr()) + "\n"
                          "Trigger " + DescribeAddr(TrigAddr()) + " (float)\n"
                          "X " + DescribeAddr(PLAYER_X_ADDR) + "\n"
