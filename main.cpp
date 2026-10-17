@@ -484,6 +484,10 @@ namespace CTRPluginFramework
         }
     }
 
+    // 座標(X/Y/Z)だけ、別のずらし量を使えるようにする(「座標アドレスを探す」で決める)
+    static bool g_coordSet = false;
+    static int  g_coordShift = 0;
+
     static u32 Adj(u32 oldAddr)
     {
         u32 top = oldAddr >> 24;
@@ -496,9 +500,15 @@ namespace CTRPluginFramework
         return oldAddr;
     }
 
-    #define PLAYER_X_ADDR  (Adj(0x08852E10))
-    #define PLAYER_Y_ADDR  (Adj(0x08852E14)) /* 高さ */
-    #define PLAYER_Z_ADDR  (Adj(0x08852E18))
+    static u32 Adj(u32 oldAddr);
+    static u32 AdjCoord(u32 oldAddr)
+    {
+        return g_coordSet ? oldAddr + (u32)g_coordShift : Adj(oldAddr);
+    }
+
+    #define PLAYER_X_ADDR  (AdjCoord(0x08852E10))
+    #define PLAYER_Y_ADDR  (AdjCoord(0x08852E14)) /* 高さ */
+    #define PLAYER_Z_ADDR  (AdjCoord(0x08852E18))
     #define AIR_WALK_ADDR  (Adj(0x08001DC0)) /* 空中歩行 : 0 を書く(txt) */
     #define SLOW_FALL_ADDR (Adj(0x0883A4C4)) /* 低速落下(txt) / 空中歩行可能(3gx) : 1 を書く(1バイト) */
     #define STAMINA_ADDR   (Adj(0x08001F2C)) /* スタミナ(float)。1.0 で無限 */
@@ -734,6 +744,85 @@ namespace CTRPluginFramework
         }
     }
 
+    // ================= 座標アドレスを探す =================
+    // Old3DS の座標アドレス(08852E10〜)に、いろいろなずらし量を足してみて、
+    // X/Y/Z が座標らしい浮動小数点になる場所を探す。キャラを動かして繰り返すと、動いた値だけが残る。
+    struct CoordCand
+    {
+        int   shift;
+        float x, y, z;
+        bool  changed;
+    };
+    static std::vector<CoordCand> g_prevCoord;
+
+    static bool PlausibleF(float f)
+    {
+        if (!(f == f))
+            return false;
+        float a = f < 0 ? -f : f;
+        return a < 100000.0f && (a == 0.0f || a > 0.001f);
+    }
+
+    static void FindCoordMenu(void)
+    {
+        std::vector<int> shifts;
+        for (int s = -0x2000; s <= 0x2000; s += 4)
+            shifts.push_back(s);
+        for (int k = -0x200; k <= 0x200; k++)
+            if (k * 0x1000 < -0x2000 || k * 0x1000 > 0x2000)
+                shifts.push_back(k * 0x1000);
+
+        std::vector<CoordCand> cands;
+        for (size_t i = 0; i < shifts.size() && cands.size() < 60; i++)
+        {
+            u32 base = 0x08852E10 + (u32)shifts[i];
+            float x, y, z;
+            if (!Process::ReadFloat(base, x) || !Process::ReadFloat(base + 4, y) || !Process::ReadFloat(base + 8, z))
+                continue;
+            if (!PlausibleF(x) || !PlausibleF(y) || !PlausibleF(z))
+                continue;
+            int big = 0;
+            if ((x < 0 ? -x : x) > 0.5f) big++;
+            if ((y < 0 ? -y : y) > 0.5f) big++;
+            if ((z < 0 ? -z : z) > 0.5f) big++;
+            if (big < 2)
+                continue;
+            CoordCand c;
+            c.shift = shifts[i]; c.x = x; c.y = y; c.z = z; c.changed = false;
+            for (size_t j = 0; j < g_prevCoord.size(); j++)
+                if (g_prevCoord[j].shift == c.shift && (g_prevCoord[j].x != x || g_prevCoord[j].z != z))
+                    c.changed = true;
+            cands.push_back(c);
+        }
+        // 前回から値が変わったものを先頭に
+        std::vector<CoordCand> sorted;
+        for (size_t i = 0; i < cands.size(); i++) if (cands[i].changed) sorted.push_back(cands[i]);
+        for (size_t i = 0; i < cands.size(); i++) if (!cands[i].changed) sorted.push_back(cands[i]);
+        g_prevCoord = cands;
+
+        if (sorted.empty())
+        {
+            ShowInfo("座標らしい値の組が見つかりませんでした。\nキャラを動かして、もう一度試してください。");
+            return;
+        }
+        std::vector<std::string> labels;
+        for (size_t i = 0; i < sorted.size(); i++)
+        {
+            char b[96];
+            snprintf(b, sizeof(b), "%s%s X%.0f Y%.0f Z%.0f", sorted[i].changed ? "[変化] " : "", Hex8((u32)sorted[i].shift).c_str(),
+                     sorted[i].x, sorted[i].y, sorted[i].z);
+            labels.push_back(b);
+        }
+        Keyboard pk("座標の候補(" + Dec((u32)sorted.size()) + "件)。キャラを動かして、もう一度探すと絞れます", labels);
+        int pr = pk.Open();
+        if (pr >= 0 && pr < (int)sorted.size())
+        {
+            g_coordSet = true;
+            g_coordShift = sorted[pr].shift;
+            OSD::Notify("Coord shift: " + Hex8((u32)g_coordShift));
+        }
+    }
+
     static bool PickMap(u32 &outId, std::string &outName); // 後ろで定義
 
     // 指定した値(=今いるマップのID)と同じ値が入っているアドレスを、メモリ全体から探す
@@ -942,6 +1031,7 @@ namespace CTRPluginFramework
                 std::string("きっかけ(Y座標): ") + (g_trigOn ? "ON" : "OFF"),
                 "きっかけのアドレス: " + Hex8(TrigAddr()),
                 "現在の値を確認",
+                std::string("座標アドレスを探す(今: ") + (g_coordSet ? Hex8((u32)g_coordShift) : std::string("配置に従う")) + ")",
                 std::string("配置: ") + (g_layoutMode == 0 ? "自動" : (g_layoutMode == 1 ? "New3DS" : (g_layoutMode == 2 ? "Old3DS" : (g_layoutMode == 3 ? "Citra" : "手動"))))
                     + "(" + LayoutName() + ")",
             };
@@ -972,6 +1062,8 @@ namespace CTRPluginFramework
                     g_trigAddr = v;
             }
             else if (r == 6)
+                FindCoordMenu();
+            else if (r == 7)
             {
                 std::vector<std::string> lm = {"自動判定", "New3DS", "Old3DS", "Citra/Azahar(-0x1000)", "手動ずらし量(16進を入力)"};
                 Keyboard lk("メモリ配置", lm);
@@ -1278,16 +1370,16 @@ namespace CTRPluginFramework
         {"あやかしのカギ（鹿）", 0xE775837A, 1},
         {"あやかしのカギ（蝶）", 0x73866A27, 1},
         {"親方の油", 0x7D5DE215, 1},
-        {"ニャーＫＢの生写真 @", 0xC264E0A6, 1},
-        {"ニャーＫＢの生写真 A", 0x52DBFD37, 1},
-        {"ニャーＫＢの生写真 B", 0x25DCCDA1, 1},
-        {"ニャーＫＢの生写真 C", 0x451B4444, 1},
-        {"ニャーＫＢの生写真 D", 0x321C74D2, 1},
-        {"ニャーＫＢの生写真 E", 0xAB152568, 1},
-        {"ニャーＫＢの生写真 F", 0xDC1215FE, 1},
-        {"ニャーＫＢの生写真 G", 0x4276805D, 1},
-        {"ニャーＫＢの生写真 H", 0x3571B0CB, 1},
-        {"ニャーＫＢの生写真 I", 0xAC78E171, 1},
+        {"ニャーＫＢの生写真�@", 0xC264E0A6, 1},
+        {"ニャーＫＢの生写真�A", 0x52DBFD37, 1},
+        {"ニャーＫＢの生写真�B", 0x25DCCDA1, 1},
+        {"ニャーＫＢの生写真�C", 0x451B4444, 1},
+        {"ニャーＫＢの生写真�D", 0x321C74D2, 1},
+        {"ニャーＫＢの生写真�E", 0xAB152568, 1},
+        {"ニャーＫＢの生写真�F", 0xDC1215FE, 1},
+        {"ニャーＫＢの生写真�G", 0x4276805D, 1},
+        {"ニャーＫＢの生写真�H", 0x3571B0CB, 1},
+        {"ニャーＫＢの生写真�I", 0xAC78E171, 1},
         {"ケツプリドラゴン", 0xDB7FD1E7, 1},
         {"Ｃ‐３０２号室のカギ", 0x4BC0CC76, 1},
         {"Ａ‐２０１号室のカギ", 0x3CC7FCE0, 1},
