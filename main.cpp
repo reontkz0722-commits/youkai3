@@ -412,10 +412,10 @@ namespace CTRPluginFramework
     {
         u32 v = 0;
         if (!Process::Read32(addr, v))
-            return Hex8(addr) + ": 読み取り失敗";
+            return Hex8(addr) + (ascii ? ": read failed" : ": 読み取り失敗");
         const char *n = MapNameOf(v);
         std::string name = n ? (ascii ? CodeOf(n) : std::string(n)) : std::string();
-        return Hex8(addr) + ": " + Hex8(v) + (n ? " = " + name : std::string(" (一覧にない)"));
+        return Hex8(addr) + ": " + Hex8(v) + (n ? " = " + name : std::string(ascii ? " (not in list)" : " (一覧にない)"));
     }
 
     static void ShowInfo(const std::string &text)
@@ -447,7 +447,8 @@ namespace CTRPluginFramework
     // Old3DS用の 08xxxxxx を基準にして、環境ごとに次のようにずらす(変換ツールの規則):
     //   New3DS : +0x03C00000      Citra/Azahar : -0x00001000      Old3DS : そのまま
     // コード領域(00xxxxxx)は同じ。レイアウトは自動判定(枠のマップIDが読める場所)か、手動で選ぶ。
-    static int g_layoutMode = 0; // 0=自動 1=New3DS 2=Old3DS 3=Citra
+    static int g_layoutMode = 0; // 0=自動 1=New3DS 2=Old3DS 3=Citra 4=手動(ずらし量)
+    static int g_shift = 0;      // 手動配置のずらし量(Old3DS基準の 08xxxxxx に足す)
 
     // 実際に使うレイアウト: 0=Old 1=New 2=Citra
     static int CurLayout(void)
@@ -455,6 +456,7 @@ namespace CTRPluginFramework
         if (g_layoutMode == 1) return 1;
         if (g_layoutMode == 2) return 0;
         if (g_layoutMode == 3) return 2;
+        if (g_layoutMode == 4) return 3;
         static int cache = -1; // 判定できたら固定する
         if (cache < 0)
         {
@@ -477,6 +479,7 @@ namespace CTRPluginFramework
         {
             case 0:  return "Old3DS";
             case 2:  return "Citra";
+            case 3:  return "手動";
             default: return "New3DS";
         }
     }
@@ -489,6 +492,7 @@ namespace CTRPluginFramework
         int l = CurLayout();
         if (l == 1) return oldAddr + 0x03C00000;
         if (l == 2) return oldAddr - 0x1000;
+        if (l == 3) return oldAddr + (u32)g_shift;
         return oldAddr;
     }
 
@@ -648,7 +652,7 @@ namespace CTRPluginFramework
             if (g_destId == 0)
             {
                 if (!g_wasDown)
-                    OSD::Notify("マップワープ: 先に行き先を選んでください");
+                    OSD::Notify("Map Warp: select a destination first");
             }
             else
             {
@@ -656,7 +660,7 @@ namespace CTRPluginFramework
                     DoTrigger();
                 bool ok = Process::Write32(SlotAddr(), g_destId);
                 if (!g_wasDown)
-                    OSD::Notify(std::string(ok ? "書き込みOK  " : "書き込み失敗  ") + DescribeAddr(SlotAddr()));
+                    OSD::Notify(std::string(ok ? "write ok  " : "write FAILED  ") + DescribeAddr(SlotAddr(), true));
             }
         }
         g_wasDown = down;
@@ -730,69 +734,108 @@ namespace CTRPluginFramework
         }
     }
 
+    static bool PickMap(u32 &outId, std::string &outName); // 後ろで定義
+
+    // 指定した値(=今いるマップのID)と同じ値が入っているアドレスを、メモリ全体から探す
+    static void ScanForValue(u32 value, std::vector<u32> &out)
+    {
+        out.clear();
+        u32 addr = 0x08000000;
+        while (addr < 0x10000000 && out.size() < 3000)
+        {
+            MemInfo mi;
+            PageInfo pi;
+            if (svcQueryMemory(&mi, &pi, addr) < 0)
+                break;
+            u32 end = mi.base_addr + mi.size;
+            if (end <= addr)
+                break;
+            if ((mi.perm & MEMPERM_READ) && mi.state != MEMSTATE_FREE && mi.state != MEMSTATE_IO)
+            {
+                u32 a = ((mi.base_addr > addr) ? mi.base_addr : addr) & ~3u;
+                u32 stop = (end < 0x10000000) ? end : 0x10000000;
+                for (; a + 4 <= stop; a += 4)
+                {
+                    if (*(volatile u32 *)a == value)
+                    {
+                        out.push_back(a);
+                        if (out.size() >= 3000)
+                            break;
+                    }
+                }
+            }
+            addr = end;
+        }
+    }
+
+    static std::vector<u32> g_scanA;      // 手順1で見つかったアドレス
+    static u32              g_scanAId = 0;
+
     static void FindSlotMenu(void)
     {
         for (;;)
         {
             std::vector<std::string> opts =
             {
-                "メモリをスキャン",
-                "結果から枠を選ぶ",
+                "手順1: 今のマップを指定してスキャン",
+                "手順2: 移動後のマップを指定して絞り込み",
                 "今の枠: " + Hex8(SlotAddr()),
                 "枠のアドレスを入力(16進)",
             };
-            Keyboard kb("マップ枠を探す", opts);
+            Keyboard kb("マップ枠を探す(2回に分けて探します)", opts);
             int r = kb.Open();
             if (r < 0)
                 return;
 
             if (r == 0)
             {
-                OSD::Notify("メモリをスキャン中... しばらくお待ちください");
-                ScanMapSlots();
-                ShowInfo("スキャン完了: " + Dec((u32)g_hits.size()) + "件\nマップを移動してもう一度スキャンすると、\n値が変わったアドレスが枠です。");
+                u32 id = 0;
+                std::string name;
+                if (!PickMap(id, name))
+                    continue;
+                OSD::Notify("Scanning memory... please wait");
+                ScanForValue(id, g_scanA);
+                g_scanAId = id;
+                ShowInfo("手順1 完了\n探した値: " + Hex8(id) + " " + name + "\n見つかったアドレス: " + Dec((u32)g_scanA.size()) + "件\n"
+                         "次に、ドアなどで別のマップへ移動して、\n手順2を実行してください。");
             }
             else if (r == 1)
             {
-                // 前回と値が変わった場所を先頭に並べる
-                std::vector<Hit> list;
-                std::vector<std::string> labels;
-                for (size_t i = 0; i < g_hits.size(); i++)
+                if (g_scanA.empty())
                 {
-                    bool changed = false;
-                    for (size_t j = 0; j < g_prevHits.size(); j++)
-                        if (g_prevHits[j].addr == g_hits[i].addr && g_prevHits[j].id != g_hits[i].id)
-                            changed = true;
-                    if (changed)
-                    {
-                        list.push_back(g_hits[i]);
-                        const char *n = MapNameOf(g_hits[i].id);
-                        labels.push_back("[変化] " + Hex8(g_hits[i].addr) + " " + (n ? n : "?"));
-                    }
-                }
-                for (size_t i = 0; i < g_hits.size() && list.size() < 200; i++)
-                {
-                    bool already = false;
-                    for (size_t j = 0; j < list.size(); j++)
-                        if (list[j].addr == g_hits[i].addr)
-                            already = true;
-                    if (already)
-                        continue;
-                    list.push_back(g_hits[i]);
-                    const char *n = MapNameOf(g_hits[i].id);
-                    labels.push_back(Hex8(g_hits[i].addr) + " " + (n ? n : "?"));
-                }
-                if (list.empty())
-                {
-                    ShowInfo("結果がありません。先にスキャンしてください。");
+                    ShowInfo("先に手順1を実行してください。");
                     continue;
                 }
-                Keyboard pk("今のマップが入っている枠", labels);
-                int pr = pk.Open();
-                if (pr >= 0 && pr < (int)list.size())
+                u32 id = 0;
+                std::string name;
+                if (!PickMap(id, name))
+                    continue;
+                std::vector<u32> cand;
+                std::vector<std::string> labels;
+                for (size_t i = 0; i < g_scanA.size(); i++)
                 {
-                    g_slot = list[pr].addr;
-                    OSD::Notify("枠を設定: " + Hex8(g_slot));
+                    u32 v = 0;
+                    if (Process::Read32(g_scanA[i], v) && v == id)
+                    {
+                        cand.push_back(g_scanA[i]);
+                        labels.push_back(Hex8(g_scanA[i]));
+                    }
+                }
+                if (cand.empty())
+                {
+                    ShowInfo("該当なし: " + Hex8(id) + " " + name + "\n手順1で探したアドレスの中に、\nその値に変わったものはありません。\n"
+                             "マップ名を確かめて、手順1からやり直してください。");
+                    continue;
+                }
+                Keyboard pk("枠の候補(" + Dec((u32)cand.size()) + "件)。先頭を試す", labels);
+                int pr = pk.Open();
+                if (pr >= 0 && pr < (int)cand.size())
+                {
+                    g_slot = cand[pr];
+                    g_shift = (int)(g_slot - 0x08727284);
+                    g_layoutMode = 4;
+                    g_trigAddr = 0;
+                    OSD::Notify("Slot set: " + Hex8(g_slot) + " shift " + Hex8((u32)g_shift));
                 }
             }
             else if (r == 3)
@@ -825,7 +868,8 @@ namespace CTRPluginFramework
         return 6;
     }
 
-    static void SelectDestination(void)
+    // マップを選んで、ID と名前を返す(ワープの行き先選びと、枠探しの両方で使う)
+    static bool PickMap(u32 &outId, std::string &outName)
     {
         std::vector<std::string> cats =
         {
@@ -835,20 +879,18 @@ namespace CTRPluginFramework
         Keyboard kb("カテゴリ", cats);
         int c = kb.Open();
         if (c < 0)
-            return;
+            return false;
 
         if (c == 7)
         {
-            u32 v = g_destId;
+            u32 v = outId;
             Keyboard hex("マップID(16進)");
             hex.IsHexadecimal(true);
-            if (hex.Open(v, g_destId) >= 0)
-            {
-                g_destId = v;
-                g_destName = "(hex input)";
-                OSD::Notify("マップIDを設定しました");
-            }
-            return;
+            if (hex.Open(v, outId) < 0)
+                return false;
+            outId = v;
+            outName = "(hex input)";
+            return true;
         }
 
         std::vector<u32>         idx;
@@ -865,11 +907,23 @@ namespace CTRPluginFramework
         Keyboard list("マップを選択", names);
         int s = list.Open();
         if (s < 0 || s >= (int)idx.size())
-            return;
+            return false;
 
-        g_destId = g_maps[idx[s]].id;
-        g_destName = g_maps[idx[s]].name;
-        OSD::Notify("行き先: " + g_destName);
+        outId = g_maps[idx[s]].id;
+        outName = g_maps[idx[s]].name;
+        return true;
+    }
+
+    static void SelectDestination(void)
+    {
+        u32 id = g_destId;
+        std::string name;
+        if (PickMap(id, name))
+        {
+            g_destId = id;
+            g_destName = name;
+            OSD::Notify("Dest: " + CodeOf(g_destName.c_str()));
+        }
     }
 
     static void MapWarpMenu(MenuEntry *entry)
@@ -888,7 +942,7 @@ namespace CTRPluginFramework
                 std::string("きっかけ(Y座標): ") + (g_trigOn ? "ON" : "OFF"),
                 "きっかけのアドレス: " + Hex8(TrigAddr()),
                 "現在の値を確認",
-                std::string("配置: ") + (g_layoutMode == 0 ? "自動" : (g_layoutMode == 1 ? "New3DS" : (g_layoutMode == 2 ? "Old3DS" : "Citra")))
+                std::string("配置: ") + (g_layoutMode == 0 ? "自動" : (g_layoutMode == 1 ? "New3DS" : (g_layoutMode == 2 ? "Old3DS" : (g_layoutMode == 3 ? "Citra" : "手動"))))
                     + "(" + LayoutName() + ")",
             };
             Keyboard kb("マップワープ(ホットキー長押し)", opts);
@@ -919,14 +973,22 @@ namespace CTRPluginFramework
             }
             else if (r == 6)
             {
-                std::vector<std::string> lm = {"自動判定", "New3DS", "Old3DS", "Citra/Azahar"};
+                std::vector<std::string> lm = {"自動判定", "New3DS", "Old3DS", "Citra/Azahar(-0x1000)", "手動ずらし量(16進を入力)"};
                 Keyboard lk("メモリ配置", lm);
                 int lr = lk.Open();
                 if (lr >= 0) g_layoutMode = lr;
+                if (lr == 4)
+                {
+                    u32 v = (u32)g_shift;
+                    Keyboard sh("ずらし量(16進。負の値は FFF00000 のように入力)");
+                    sh.IsHexadecimal(true);
+                    if (sh.Open(v, (u32)g_shift) >= 0)
+                        g_shift = (int)v;
+                }
             }
             else if (r == 5)
             {
-                ShowInfo(std::string("配置: ") + LayoutName() + "\n"
+                ShowInfo(std::string("配置: ") + LayoutName() + " (ずらし量 " + Hex8((u32)g_shift) + ")\n"
                          "枠 " + DescribeAddr(SlotAddr()) + "\n"
                          "きっかけ " + DescribeAddr(TrigAddr()) + "\n"
                          "X " + DescribeAddr(PLAYER_X_ADDR) + "\n"
@@ -2031,8 +2093,8 @@ namespace CTRPluginFramework
         if (g_itemOnStart && Controller::IsKeyPressed((Key)0x08))
         {
             bool ok = CreateItem();
-            OSD::Notify(ok ? "アイテムを作成: " + Hex8(g_itemId) + " x" + Dec(g_itemCount)
-                           : std::string("アイテム作成: IDを設定してください"));
+            OSD::Notify(ok ? "Item created: " + Hex8(g_itemId) + " x" + Dec(g_itemCount)
+                           : std::string("Item: set an ID first"));
         }
     }
 
@@ -2060,7 +2122,7 @@ namespace CTRPluginFramework
             return;
         g_itemId   = g_items[idx[s]].id;
         g_itemName = g_items[idx[s]].name;
-        OSD::Notify("アイテム: " + g_itemName);
+        OSD::Notify("Item: " + Hex8(g_itemId));
     }
 
     static void ItemMenu(MenuEntry *entry)
@@ -2122,7 +2184,7 @@ namespace CTRPluginFramework
                 if (ak.Open() == 0)
                 {
                     bool ok = CreateItem();
-                    OSD::Notify(ok ? "アイテムを作成しました" : "作成できませんでした");
+                    OSD::Notify(ok ? "Item created" : "Item creation failed");
                 }
             }
             else if (r == 5)
@@ -2145,14 +2207,14 @@ namespace CTRPluginFramework
         if (ok)
             snprintf(line, sizeof(line), "X:%.1f Y:%.1f Z:%.1f", x, y, z);
         else
-            snprintf(line, sizeof(line), "座標: 読み取り失敗");
+            snprintf(line, sizeof(line), "coords: read failed");
         u32 py = screen.Draw(line, 8, 8);
 
         u32 id = 0;
         if (Process::Read32(SlotAddr(), id))
         {
             const char *n = MapNameOf(id);
-            std::string m = "マップ: " + Hex8(id) + (n ? std::string(" ") + n : std::string(""));
+            std::string m = "Map: " + Hex8(id) + (n ? " " + CodeOf(n) : std::string(""));
             screen.Draw(m, 8, py);
         }
         return true;
